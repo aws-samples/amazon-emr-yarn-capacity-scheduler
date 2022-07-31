@@ -1,0 +1,47 @@
+[
+    {
+      "ParameterKey": "ArtifactsS3Repository",
+      "ParameterValue": "emr-yarn-capacity-scheduler-<AWS_ACCOUNT_ID>-<AWS_REGION>"
+    },
+    {
+      "ParameterKey": "ProjectName",
+      "ParameterValue": "emr-scheduler"
+    },
+    {
+      "ParameterKey": "clientCIDR",
+      "ParameterValue": "XX.XX.XX.XX/32"
+    },
+    {
+      "ParameterKey": "VpcNetwork",
+      "ParameterValue": "10.0.0.0/16"
+    },
+    {
+      "ParameterKey": "SubnetPublicNetwork",
+      "ParameterValue": "10.0.10.0/24"
+    },
+    {
+      "ParameterKey": "SubnetPublicAZ",
+      "ParameterValue": "us-east-1a"
+    },
+    {
+      "ParameterKey": "emrCoreNodeCount",
+      "ParameterValue": "1"
+    },
+    {
+      "ParameterKey": "emrInstanceType",
+      "ParameterValue": "m5.2xlarge"
+    },
+    {
+      "ParameterKey": "emrKeyName",
+      "ParameterValue": "YOUR_EXISTING_KEY_PAIR"
+    },
+    {
+      "ParameterKey": "emrRelease",
+      "ParameterValue": "emr-6.5.0"
+    },
+    {
+      "ParameterKey": "emrTaskNodeCount",
+      "ParameterValue": "1"
+    }
+  ]
+  

@@ -1,0 +1,234 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: "Creates Amazon VPC with Public Subnet, Security Groups, Internet Gateway and Gateway endpoint for Amazon S3.
+**WARNING** You will be billed for the AWS resources used if you create a stack from this template."
+
+Metadata:
+  License: Apache-2.0
+
+  "AWS::CloudFormation::Interface":
+    ParameterGroups:
+      - Label:
+          default: Core
+        Parameters:
+          - ProjectName
+      - Label:
+          default: Vpc Configuration
+        Parameters:
+          - clientCIDR
+          - VpcNetwork
+          - SubnetPublicNetwork
+          - SubnetPublicAZ
+    ParameterLabels:
+      clientCIDR:
+        default: "Client machines CIDR range"
+      VpcNetwork:
+        default: "Vpc Network"
+      SubnetPublicNetwork:
+        default: "Public Subnet"
+      SubnetPublicAZ:
+        default: "AZ Public Subnet"
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: A ProjectName label used to tag AWS resources
+    Default: emr-scheduler
+  SubnetPublicAZ:
+    Type: "AWS::EC2::AvailabilityZone::Name"
+  clientCIDR:
+    Description: CIDR range of the Client machine (echo "$(curl -s http://checkip.amazonaws.com)/32")
+    Type: String
+  VpcNetwork:
+    Description: Network range of the Vpc (ex. 10.0.0.0/16)
+    Type: String
+    Default: 10.0.0.0/16
+  SubnetPublicNetwork:
+    Description: Network range of the Public Subnet (ex. 10.0.10.0/24)
+    Type: String
+    Default: 10.0.10.0/24
+
+Resources:
+  Vpc:
+    Type: "AWS::EC2::VPC"
+    Properties:
+      CidrBlock: !Ref VpcNetwork
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}/vpc
+  PublicSubnet:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Ref SubnetPublicAZ
+      CidrBlock: !Ref SubnetPublicNetwork
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}/subnet/public/${SubnetPublicAZ}
+
+  ManagedEmrMasterSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: "managed-emr-master-sg"
+      GroupDescription: "Managed Master SG for Elastic MapReduce"
+      VpcId: !Ref Vpc
+
+  ManagedEmrMasterSGIngressTCP:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref ManagedEmrMasterSG
+      IpProtocol: tcp
+      FromPort: 0
+      ToPort: 65535
+      SourceSecurityGroupId: !Ref ManagedEmrSlaveSG
+
+  ManagedEmrMasterSGIngressUDP:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref ManagedEmrMasterSG
+      IpProtocol: udp
+      FromPort: 0
+      ToPort: 65535
+      SourceSecurityGroupId: !Ref ManagedEmrSlaveSG
+
+  ManagedEmrMasterSGIngressICMP:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref ManagedEmrMasterSG
+      IpProtocol: icmp
+      FromPort: -1
+      ToPort: -1
+      SourceSecurityGroupId: !Ref ManagedEmrSlaveSG
+
+  ManagedEmrSlaveSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: "managed-emr-slave-sg"
+      GroupDescription: "Managed Slave SG for Elastic MapReduce"
+      VpcId: !Ref Vpc
+
+  ManagedEmrSlaveSGIngressTCP:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref ManagedEmrSlaveSG
+      IpProtocol: tcp
+      FromPort: 0
+      ToPort: 65535
+      SourceSecurityGroupId: !Ref ManagedEmrMasterSG
+
+  ManagedEmrSlaveSGIngressUDP:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref ManagedEmrSlaveSG
+      IpProtocol: udp
+      FromPort: 0
+      ToPort: 65535
+      SourceSecurityGroupId: !Ref ManagedEmrMasterSG
+
+  ManagedEmrSlaveSGIngressICMP:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref ManagedEmrSlaveSG
+      IpProtocol: icmp
+      FromPort: -1
+      ToPort: -1
+      SourceSecurityGroupId: !Ref ManagedEmrMasterSG
+
+  AdditionalEmrMasterSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: "additional-emr-master-sg"
+      GroupDescription: "Allows SSH access from client machine CIDR range"
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref clientCIDR
+
+  AdditionalEmrSlaveSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: "additional-emr-slave-sg"
+      GroupDescription: "Allows SSH access from client machine CIDR range"
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref clientCIDR
+  InternetGateway:
+    Type: "AWS::EC2::InternetGateway"
+  IGWAttachment:
+    Type: "AWS::EC2::VPCGatewayAttachment"
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref Vpc
+  PublicRouteTable:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}/vpc/route/public
+  PublicRoute:
+    Type: "AWS::EC2::Route"
+    DependsOn: IGWAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  PublicRouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet
+
+  EndpointS3:
+    Type: "AWS::EC2::VPCEndpoint"
+    DependsOn:
+      - PublicRoute
+    Properties:
+      VpcId: !Ref Vpc
+      PolicyDocument:
+        Statement:
+          - Action: "*"
+            Effect: Allow
+            Resource: "*"
+            Principal: "*"
+      RouteTableIds:
+        - !Ref PublicRouteTable
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
+
+Outputs:
+  VpcId:
+    Description: Vpc Id
+    Value: !Ref Vpc
+
+  VpcRange:
+    Description: Vpc Network Range CIDR
+    Value: !Ref VpcNetwork
+
+  PublicSubnetID:
+    Description: id of the public subnet
+    Value: !Ref PublicSubnet
+
+  EmrManagedMasterSGID:
+    Description: id of the managed EMR master security group
+    Value: !Ref ManagedEmrMasterSG
+
+  EmrManagedSlaveSGID:
+    Description: id of the managed EMR slave security group
+    Value: !Ref ManagedEmrSlaveSG
+
+  AdditionalEmrMasterSGID:
+    Description: id of the additional EMR master security group
+    Value: !Ref AdditionalEmrMasterSG
+
+  AdditionalEmrSlaveSGID:
+    Description: id of the additional EMR slave security group
+    Value: !Ref AdditionalEmrSlaveSG

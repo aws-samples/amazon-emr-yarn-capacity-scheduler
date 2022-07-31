@@ -1,0 +1,132 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: "Creates Amazon VPC and Amazon EMR cluster.
+**WARNING** You will be billed for the AWS resources used if you create a stack from this template."
+
+Metadata:
+  "AWS::CloudFormation::Interface":
+    ParameterGroups:
+      - Label:
+          default: Core
+        Parameters:
+          - ProjectName
+          - ArtifactsS3Repository
+      - Label:
+          default: Network
+        Parameters:
+          - clientCIDR
+          - VpcNetwork
+          - SubnetPublicNetwork
+          - SubnetPublicAZ
+      - Label:
+          default: EMR
+        Parameters:
+          - emrRelease
+          - emrInstanceType
+          - emrCoreNodeCount
+          - emrTaskNodeCount
+          - emrKeyName
+
+    ParameterLabels:
+      ArtifactsS3Repository:
+        default: "Code Repository in S3"
+      clientCIDR:
+        default: "Client machines CIDR range"
+      VpcNetwork:
+        default: "VPC Network"
+      SubnetPublicNetwork:
+        default: "Public Subnet"
+      SubnetPublicAZ:
+        default: "AZ Public Subnet"
+
+      emrRelease:
+        default: "Release Version"
+      emrInstanceType:
+        default: "(Workers) Instance Type"
+      emrCoreNodeCount:
+        default: "(Workers) Core Node Count"
+      emrTaskNodeCount:
+        default: "(Workers) Task Node Count"
+      emrKeyName:
+        default: "SSH Key Name used for EMR"
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: A projectName label used to tag AWS resources
+    Default: emr-scheduler
+  ArtifactsS3Repository:
+    Description: S3 bucket name for artifact repository
+    Type: String
+
+  # VPC parameters
+  SubnetPublicAZ:
+    Type: "AWS::EC2::AvailabilityZone::Name"
+  clientCIDR:
+    Description: CIDR range of the Client machine (echo "$(curl -s http://checkip.amazonaws.com)/32")
+    Type: String
+  VpcNetwork:
+    Description: Network range of the Vpc (ex. 10.0.0.0/16)
+    Type: String
+    Default: 10.0.0.0/16
+  SubnetPublicNetwork:
+    Description: Network range of the Public Subnet (ex. 10.0.10.0/24)
+    Type: String
+    Default: 10.0.10.0/24
+
+  # EMR parameters
+  emrKeyName:
+    Type: String
+  emrInstanceType:
+    Type: String
+    Default: m5.xlarge
+    AllowedValues:
+      - m5.xlarge
+      - m5.2xlarge
+  emrCoreNodeCount:
+    Type: String
+    Default: 1
+  emrTaskNodeCount:
+    Type: String
+    Default: 1
+  emrRelease:
+    Description: EMR release
+    Type: String
+    Default: emr-6.5.0
+    AllowedValues:
+      - emr-5.33.1
+      - emr-5.34.0
+      - emr-5.35.0
+      - emr-6.4.0
+      - emr-6.5.0
+
+Resources:
+  VPCStack:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL: !Sub https://s3.${AWS::Region}.amazonaws.com/${ArtifactsS3Repository}/cloudformation/templates/vpc.yaml
+      Parameters:
+        ProjectName: !Ref ProjectName
+        clientCIDR: !Ref clientCIDR
+        VpcNetwork: !Ref VpcNetwork
+        SubnetPublicAZ: !Ref SubnetPublicAZ
+        SubnetPublicNetwork: !Ref SubnetPublicNetwork
+
+  EMRStack:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL: !Sub https://s3.${AWS::Region}.amazonaws.com/${ArtifactsS3Repository}/cloudformation/templates/emr.yaml
+      Parameters:
+        ProjectName: !Ref ProjectName
+        Vpc: !GetAtt VPCStack.Outputs.VpcId
+        VpcNetwork: !Ref VpcNetwork
+        Subnet: !GetAtt VPCStack.Outputs.PublicSubnetID
+        EmrManagedMasterSG: !GetAtt VPCStack.Outputs.EmrManagedMasterSGID
+        EmrManagedSlaveSG: !GetAtt VPCStack.Outputs.EmrManagedSlaveSGID
+        AdditionalEmrMasterSG: !GetAtt VPCStack.Outputs.AdditionalEmrMasterSGID
+        AdditionalEmrSlaveSG: !GetAtt VPCStack.Outputs.AdditionalEmrSlaveSGID
+        KeyName: !Ref emrKeyName
+        emrInstanceType: !Ref emrInstanceType
+        emrCoreNodeCount: !Ref emrCoreNodeCount
+        emrTaskNodeCount: !Ref emrTaskNodeCount
+        emrRelease: !Ref emrRelease
+        ArtifactsS3Repository: !Ref ArtifactsS3Repository

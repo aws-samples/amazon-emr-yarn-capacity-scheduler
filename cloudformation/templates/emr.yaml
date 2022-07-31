@@ -1,0 +1,256 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: "Creates Amazon EMR cluster and configures Apache Hadoop YARN CapacityScheduler.
+**WARNING** You will be billed for the AWS resources used if you create a stack from this template."
+
+Metadata:
+  "AWS::CloudFormation::Interface":
+    ParameterGroups:
+      - Label:
+          default: EMR
+        Parameters:
+          - Vpc
+          - VpcNetwork
+          - Subnet
+          - EmrManagedMasterSG
+          - EmrManagedSlaveSG
+          - AdditionalEmrMasterSG
+          - AdditionalEmrSlaveSG
+          - KeyName
+          - emrInstanceType
+          - emrCoreNodeCount
+          - emrTaskNodeCount
+          - emrRelease
+          - ProjectName
+          - ArtifactsS3Repository
+
+    ParameterLabels:
+      VpcNetwork:
+        default: "Vpc Network Range"
+      EmrManagedMasterSG:
+        default: "Managed Security Group for EMR Master node/s"
+      EmrManagedSlaveSG:
+        default: "Managed Security Group for EMR Core and Task node/s"
+      AdditionalEmrMasterSG:
+        default: "Additional Security Group for EMR Master node/s"
+      AdditionalEmrSlaveSG:
+        default: "Additional Security Group for EMR Core and Task node/s"
+      KeyName:
+        default: "SSH Key Name"
+      emrRelease:
+        default: "Release Version"
+      emrInstanceType:
+        default: "Instance Type"
+      emrCoreNodeCount:
+        default: "Core Nodes Count"
+      emrTaskNodeCount:
+        default: "Task Nodes Count"
+
+Parameters:
+  Vpc:
+    Type: AWS::EC2::VPC::Id
+  VpcNetwork:
+    Description: Network range for the Vpc (ex. 10.0.0.0/16)
+    Type: String
+    Default: 10.0.0.0/16
+  Subnet:
+    Type: AWS::EC2::Subnet::Id
+  EmrManagedMasterSG:
+    Description: Managed Security Group for EMR Master node/s
+    Type: AWS::EC2::SecurityGroup::Id
+  EmrManagedSlaveSG:
+    Description: Managed Security Group for EMR Core and Task node/s
+    Type: AWS::EC2::SecurityGroup::Id
+  AdditionalEmrMasterSG:
+    Description: Additional Security Group for EMR Master node/s
+    Type: List<AWS::EC2::SecurityGroup::Id>
+  AdditionalEmrSlaveSG:
+    Description: Additional Security Group for EMR Core and Task node/s
+    Type: List<AWS::EC2::SecurityGroup::Id>
+  KeyName:
+    Type: String
+  emrInstanceType:
+    Type: String
+    Default: m5.xlarge
+    AllowedValues:
+      - m5.xlarge
+      - m5.2xlarge
+  emrCoreNodeCount:
+    Type: String
+    Default: 1
+  emrTaskNodeCount:
+    Type: String
+    Default: 1
+  emrRelease:
+    Type: String
+    Default: emr-6.5.0
+    AllowedValues:
+      - emr-5.34.0
+      - emr-5.35.0
+      - emr-5.36.0
+      - emr-6.5.0
+      - emr-6.6.0
+      - emr-6.7.0
+  ProjectName:
+    Type: String
+    Description: A ProjectName label used to tag AWS resources
+    Default: emr-scheduler
+  ArtifactsS3Repository:
+    Description: S3 bucket name for artifact repository
+    Type: String
+
+Resources:
+  emrRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2008-10-17
+        Statement:
+          - Sid: ""
+            Effect: Allow
+            Principal:
+              Service: elasticmapreduce.amazonaws.com
+            Action: "sts:AssumeRole"
+      Path: /
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AmazonElasticMapReduceRole"
+
+  emrCluster:
+    Type: AWS::EMR::Cluster
+    Properties:
+      Name: "emr-cluster-capacity-scheduler"
+      JobFlowRole: "EMR_EC2_DefaultRole"
+      ServiceRole: !Ref emrRole
+      ReleaseLabel: !Ref emrRelease
+      VisibleToAllUsers: true
+      Instances:
+        TerminationProtected: false
+        MasterInstanceGroup:
+          InstanceCount: 1
+          InstanceType: !Ref emrInstanceType
+          Market: ON_DEMAND
+          Name: Master node
+        CoreInstanceGroup:
+          InstanceCount: !Ref emrCoreNodeCount
+          InstanceType: !Ref emrInstanceType
+          Market: ON_DEMAND
+          Name: Core Instance
+        TaskInstanceGroups:
+          - InstanceCount: !Ref emrTaskNodeCount
+            InstanceType: !Ref emrInstanceType
+            Market: ON_DEMAND
+            Name: Task Instance
+        Ec2SubnetId: !Ref Subnet
+        EmrManagedMasterSecurityGroup: !Ref EmrManagedMasterSG
+        EmrManagedSlaveSecurityGroup: !Ref EmrManagedSlaveSG
+        AdditionalMasterSecurityGroups: !Ref AdditionalEmrMasterSG
+        AdditionalSlaveSecurityGroups: !Ref AdditionalEmrSlaveSG
+        Ec2KeyName: !Ref KeyName
+      BootstrapActions:
+        - Name: create-users
+          ScriptBootstrapAction:
+            Args:
+              - user1:group1
+              - user2:group2
+              - user3:group3
+              - user4:group4
+              - user5:group5
+              - user6:group6
+            Path: !Sub s3://${ArtifactsS3Repository}/scripts/create_users_ba.sh
+      Applications:
+        - Name: Hadoop
+        - Name: Hive
+        - Name: Spark
+      Configurations:
+        - Classification: "yarn-site"
+          ConfigurationProperties:
+            yarn.resourcemanager.scheduler.class: "org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler"
+            yarn.resourcemanager.scheduler.monitor.enable: "true"
+            yarn.resourcemanager.scheduler.monitor.policies: "org.apache.hadoop.yarn.server.resourcemanager.monitor.capacity.ProportionalCapacityPreemptionPolicy"
+            yarn.resourcemanager.monitor.capacity.preemption.monitoring_interval: "3000"
+            yarn.resourcemanager.monitor.capacity.preemption.max_wait_before_kill: "15000"
+            yarn.resourcemanager.monitor.capacity.preemption.total_preemption_per_round: "0.1"
+            yarn.resourcemanager.monitor.capacity.preemption.max_ignored_over_capacity: "0.1"
+            yarn.resourcemanager.monitor.capacity.preemption.natural_termination_factor: "1.0"
+            yarn.resourcemanager.monitor.capacity.preemption.intra-queue-preemption.enabled: "true"
+            yarn.cluster.max-application-priority: "100"
+            yarn.node-labels.enabled: "true"
+            yarn.node-labels.am.default-node-label-expression: "CORE"
+            yarn.acl.enable: "true"
+        - Classification: "capacity-scheduler"
+          ConfigurationProperties:
+            yarn.scheduler.capacity.resource-calculator: "org.apache.hadoop.yarn.util.resource.DominantResourceCalculator"
+            yarn.scheduler.capacity.maximum-am-resource-percent: "0.4"
+            yarn.scheduler.capacity.queue-mappings: "u:user1:adhoc,u:user2:adhoc,u:user3:data_engineering,u:user4:data_science,g:group1:adhoc,g:group2:data_engineering"
+            yarn.scheduler.capacity.root.queues: "default,adhoc,analytics"
+            yarn.scheduler.capacity.root.acl_submit_applications: " "
+            yarn.scheduler.capacity.root.acl_administer_queue: " "
+            yarn.scheduler.capacity.user.max-parallel-apps: "10"
+            yarn.scheduler.capacity.user.svc_analytics.max-parallel-apps: "20"
+            yarn.scheduler.capacity.root.default.capacity: "10"
+            yarn.scheduler.capacity.root.default.maximum-capacity: "40"
+            yarn.scheduler.capacity.root.default.minimum-user-limit-percent: "5"
+            yarn.scheduler.capacity.root.default.user-limit-factor: "4"
+            yarn.scheduler.capacity.root.default.maximum-am-resource-percent: "0.5"
+            yarn.scheduler.capacity.root.default.ordering-policy: "fair"
+            yarn.scheduler.capacity.root.default.acl_submit_applications: "*"
+            yarn.scheduler.capacity.root.default.acl_administer_queue: "*"
+            yarn.scheduler.capacity.root.default.accessible-node-labels: "*"
+            yarn.scheduler.capacity.root.default.accessible-node-labels.CORE.capacity: "10"
+            yarn.scheduler.capacity.root.default.accessible-node-labels.CORE.maximum-capacity: "40"
+            yarn.scheduler.capacity.root.adhoc.capacity: "30"
+            yarn.scheduler.capacity.root.adhoc.maximum-capacity: "90"
+            yarn.scheduler.capacity.root.adhoc.minimum-user-limit-percent: "10"
+            yarn.scheduler.capacity.root.adhoc.user-limit-factor: "3"
+            yarn.scheduler.capacity.root.adhoc.acl_submit_applications: "user1,user2 hadoop,group1"
+            yarn.scheduler.capacity.root.adhoc.acl_administer_queue: "user1,user2 hadoop,group1"
+            yarn.scheduler.capacity.root.adhoc.accessible-node-labels: "*"
+            yarn.scheduler.capacity.root.adhoc.accessible-node-labels.CORE.capacity: "30"
+            yarn.scheduler.capacity.root.adhoc.accessible-node-labels.CORE.maximum-capacity: "90"
+            yarn.scheduler.capacity.root.adhoc.default-application-priority: "10"
+            yarn.scheduler.capacity.root.analytics.capacity: "60"
+            yarn.scheduler.capacity.root.analytics.maximum-capacity: "95"
+            yarn.scheduler.capacity.root.analytics.minimum-user-limit-percent: "20"
+            yarn.scheduler.capacity.root.analytics.user-limit-factor: "1.66"
+            yarn.scheduler.capacity.root.analytics.acl_submit_applications: "user3,user4 hadoop,group2"
+            yarn.scheduler.capacity.root.analytics.acl_administer_queue: "user3,user4 hadoop,group2"
+            yarn.scheduler.capacity.root.analytics.accessible-node-labels: "*"
+            yarn.scheduler.capacity.root.analytics.accessible-node-labels.CORE.capacity: "60"
+            yarn.scheduler.capacity.root.analytics.accessible-node-labels.CORE.maximum-capacity: "95"
+            yarn.scheduler.capacity.root.analytics.default-application-priority: "20"
+            yarn.scheduler.capacity.root.analytics.queues: "data_engineering,data_science"
+            yarn.scheduler.capacity.root.analytics.data_engineering.capacity: "50"
+            yarn.scheduler.capacity.root.analytics.data_engineering.maximum-capacity: "80"
+            yarn.scheduler.capacity.root.analytics.data_engineering.accessible-node-labels: "*"
+            yarn.scheduler.capacity.root.analytics.data_engineering.accessible-node-labels.CORE.capacity: "50"
+            yarn.scheduler.capacity.root.analytics.data_engineering.accessible-node-labels.CORE.maximum-capacity: "80"
+            yarn.scheduler.capacity.root.analytics.data_science.capacity: "50"
+            yarn.scheduler.capacity.root.analytics.data_science.maximum-capacity: "95"
+            yarn.scheduler.capacity.root.analytics.data_science.accessible-node-labels: "*"
+            yarn.scheduler.capacity.root.analytics.data_science.accessible-node-labels.CORE.capacity: "50"
+            yarn.scheduler.capacity.root.analytics.data_science.accessible-node-labels.CORE.maximum-capacity: "95"
+            yarn.scheduler.capacity.root.analytics.data_science.disable_preemption: "true"
+            yarn.scheduler.capacity.root.analytics.data_science.intra-queue-preemption.disable_preemption: "true"
+
+      LogUri: !Sub "s3://aws-logs-${AWS::AccountId}-${AWS::Region}/elasticmapreduce/"
+      Tags:
+        - Key: ProjectName
+          Value: !Ref ProjectName
+
+  CreateHDFSDirectories:
+    Properties:
+      ActionOnFailure: CONTINUE
+      HadoopJarStep:
+        Args:
+          - !Sub s3://${ArtifactsS3Repository}/scripts/create_hdfs_directory.sh
+          - user1:group1
+          - user2:group2
+          - user3:group3
+          - user4:group4
+          - user5:group5
+          - user6:group6
+        Jar: s3://elasticmapreduce/libs/script-runner/script-runner.jar
+        MainClass: ""
+      JobFlowId: !Ref "emrCluster"
+      Name: CreateHDFSDirectories
+    Type: AWS::EMR::Step
