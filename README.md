@@ -117,11 +117,11 @@ aws cloudformation  delete-stack --stack-name emr-yarn-capacity-scheduler
 
 - Delete the Amazon S3 bucket
 
+Please verify before runing the command. The command deletes the bucket and all files underneath it. The files may not be recoverable after delete.
+
 ```
 aws s3 rb s3://emr-yarn-capacity-scheduler-<AWS_ACCOUNT_ID>-<AWS_REGION> --force
 ```
-
-Please verify before runing the command. The command deletes the bucket and all files underneath it. The files may not be recoverable after delete.
 
 ## Contributing
 
