@@ -1,7 +1,7 @@
-# Configure Hadoop YARN CapacityScheduler on Amazon EMR on Amazon EC2 with capacity constraints
+# Configure Hadoop YARN CapacityScheduler on Amazon EMR on Amazon EC2 under constraints of allocated capacities
 
 ## About the project
-The repository creates [Amazon EMR](https://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-what-is-emr.html) cluster and configures [Apache Hadoop YARN CapacityScheduler](https://hadoop.apache.org/docs/stable/hadoop-yarn/hadoop-yarn-site/CapacityScheduler.html). Please refer to the AWS blog post [Configure Hadoop YARN CapacityScheduler on Amazon EMR on Amazon EC2 with capacity constraints](https://aws.amazon.com/blogs/big-data/configure-hadoop-yarn-capacityscheduler-on-amazon-emr-on-amazon-ec2-with-capacity-constraints) for details.
+The repository creates [Amazon EMR](https://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-what-is-emr.html) cluster and configures [Apache Hadoop YARN CapacityScheduler](https://hadoop.apache.org/docs/stable/hadoop-yarn/hadoop-yarn-site/CapacityScheduler.html). Please refer to the AWS big data blog post [Configure Hadoop YARN CapacityScheduler on Amazon EMR on Amazon EC2 under constraints of allocated capacities](https://aws.amazon.com/blogs/big-data/configure-hadoop-yarn-capacityscheduler-on-amazon-emr-on-amazon-ec2-under-constraints-of-allocated-capacities) for details.
 
 ## Folder structure
 
@@ -31,7 +31,7 @@ Please follow the below instructions to deploy the solution in your AWS account.
 ### Clone the GitHub repo
 
 ```
-git clone https://github.com/aws-samples/amazon-emr-yarn-capacity-scheduler.git
+git clone git@github.com:aws-samples/amazon-emr-yarn-capacity-scheduler.git
 ```
 
 ### Create Amazon S3 bucket
@@ -66,7 +66,7 @@ aws cloudformation create-stack \
 --template-url https://emr-yarn-capacity-scheduler-<AWS_ACCOUNT_ID>-<AWS_REGION>.s3.amazonaws.com/cloudformation/templates/main.yaml \
 --parameters file://emr-yarn-capacity-scheduler/cloudformation/parameters/parameters.json \
 --capabilities CAPABILITY_NAMED_IAM \
---region us-east-1
+--region <AWS_REGION>
 ```
 
 ### Navigate to AWS Management Console > CloudFormation and check for the successful deployment of the following stacks
