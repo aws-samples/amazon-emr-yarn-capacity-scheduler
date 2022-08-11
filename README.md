@@ -1,6 +1,6 @@
-## Configure Hadoop YARN CapacityScheduler on Amazon EMR on Amazon EC2 under constraints of allocated capacities
+## Configure Hadoop YARN CapacityScheduler on Amazon EMR on Amazon EC2 for multi-tenant heterogeneous workloads
 
-The repository creates [Amazon EMR](https://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-what-is-emr.html) cluster and configures [Apache Hadoop YARN CapacityScheduler](https://hadoop.apache.org/docs/stable/hadoop-yarn/hadoop-yarn-site/CapacityScheduler.html). Please refer to the AWS big data blog post [Configure Hadoop YARN CapacityScheduler on Amazon EMR on Amazon EC2 under constraints of allocated capacities](https://aws.amazon.com/blogs/big-data/configure-hadoop-yarn-capacityscheduler-on-amazon-emr-on-amazon-ec2-under-constraints-of-allocated-capacities) for details.
+The repository creates [Amazon EMR](https://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-what-is-emr.html) cluster and configures [Apache Hadoop YARN CapacityScheduler](https://hadoop.apache.org/docs/stable/hadoop-yarn/hadoop-yarn-site/CapacityScheduler.html). Please refer to the AWS big data blog post [Configure Hadoop YARN CapacityScheduler on Amazon EMR on Amazon EC2 for multi-tenant heterogeneous workloads](https://aws.amazon.com/blogs/big-data/configure-hadoop-yarn-capacityscheduler-on-amazon-emr-on-amazon-ec2-for-multi-tenant-heterogeneous-workloads) for details.
 
 ## Folder structure
 
